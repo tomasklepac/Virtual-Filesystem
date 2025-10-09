@@ -1,4 +1,4 @@
-# ZOS Virtual Filesystem
+# Virtual Filesystem
 
 A lightweight virtual filesystem implemented in **C++** as part of the *Operating Systems Fundamentals* course at the University of West Bohemia.
 
