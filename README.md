@@ -1,16 +1,19 @@
-# Virtual Filesystem
+# 🗂️ Virtual Filesystem
 
-A lightweight virtual filesystem implemented in **C++** as part of the *Operating Systems Fundamentals* course at the University of West Bohemia.
+A lightweight virtual filesystem implemented in **C++** as part of the *Operating Systems Fundamentals (ZOS)* course at the University of West Bohemia.  
+This project simulates the structure and behavior of a real filesystem inside a single binary file (`myfs.dat`).
 
 ---
 
 ## 🧠 Project Overview
-This project simulates the structure of a real filesystem inside a single binary file (`myfs.dat`).  
-It demonstrates core OS concepts such as:
+This project demonstrates core operating system concepts such as:
 - superblock and metadata management,
-- inode tables and directory structures,
-- virtual data clusters,
-- formatted disk initialization.
+- inode table and directory hierarchy,
+- virtual data blocks (clusters),
+- formatted disk initialization and allocation,
+- real implementation of filesystem commands (`mkdir`, upcoming `ls`, etc.).
+
+The goal is to emulate the low-level mechanisms used in real filesystems (e.g., ext2, MINIX), including binary data layout and direct manipulation of structures on disk.
 
 ---
 
@@ -18,16 +21,19 @@ It demonstrates core OS concepts such as:
 ✅ Create and format a virtual filesystem  
 ✅ Write metadata (superblock, bitmaps, inode table)  
 ✅ Create the root directory (inode 0)  
-✅ Read and print the superblock contents
+✅ Implement the `mkdir` command for creating new directories  
+✅ Automatic creation of `.` and `..` entries in each new directory  
+✅ Update parent directory with new entries  
+🕓 (Work in progress) — Implementing `ls`, `cd`, and `pwd`
 
 ---
 
 ## ⚙️ Build and Run
-**Requirements:**
+**Requirements**
 - Visual Studio 2022 (C++ workload installed)
 - Windows 10 or later
 
-**How to run:**
+**Steps to build:**
 1. Clone the repository:
    ```bash
-   git clone https://github.com/<your-username>/ZOS_VirtualFilesystem.git
+   git clone https://github.com/<your-username>/VirtualFilesystem.git
