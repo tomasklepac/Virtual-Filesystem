@@ -231,3 +231,135 @@ long long FileSystem::dataBlockOffset(int blokId) {
     return static_cast<long long>(sb.data_start_adress)
         + static_cast<long long>(blokId) * static_cast<long long>(sb.cluster_size);
 }
+
+// Checks if a directory (by its inode ID) contains an item with the given name
+bool FileSystem::directoryContains(int dirInodeId, const std::string& name) {
+    // Read the directory inode
+    Inode dirInode = readInode(dirInodeId);
+    if (!dirInode.is_directory) {
+        std::cerr << "Given inode is not a directory." << std::endl;
+        return false;
+    }
+
+    // Read the directory's data block
+    Superblock sb = readSuperblock();
+    std::ifstream file(filename_, std::ios::binary);
+    file.seekg(dataBlockOffset(dirInode.direct1));
+
+    DirectoryItem item{};
+    int entries = dirInode.file_size / sizeof(DirectoryItem);
+
+    for (int i = 0; i < entries; ++i) {
+        file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
+        if (std::string(item.item_name) == name) {
+            return true; // Name found
+        }
+    }
+    return false; // Name free
+}
+
+// Creates a new directory inside the current working directory (root for now)
+void FileSystem::mkdir(const std::string& name) {
+    const int parentInodeId = 0; // Current working directory (root)
+
+    // --- STEP 1: Validate input name ---
+    if (name.empty()) {
+        std::cerr << "[mkdir] Error: directory name is empty." << std::endl;
+        return;
+    }
+
+    if (name.size() > 11) { // DirectoryItem::item_name[12] ? 11 usable chars + '\0'
+        std::cerr << "[mkdir] Error: directory name too long (max 11 characters)." << std::endl;
+        return;
+    }
+
+    if (name.find('/') != std::string::npos) {
+        std::cerr << "[mkdir] Error: directory name cannot contain '/'." << std::endl;
+        return;
+    }
+
+    // --- STEP 2: Check if item already exists in parent directory ---
+    if (directoryContains(parentInodeId, name)) {
+        std::cerr << "[mkdir] Error: an item with this name already exists." << std::endl;
+        return;
+    }
+
+    // --- STEP 3: Load parent inode (root) ---
+    Inode parentInode = readInode(parentInodeId);
+    if (!parentInode.is_directory) {
+        std::cerr << "[mkdir] Error: current inode is not a directory (filesystem corruption?)." << std::endl;
+        return;
+    }
+
+    // --- STEP 4: Allocate new inode and data block ---
+    int newInodeId = allocateFreeInode();
+    int newBlockId = allocateFreeDataBlock();
+
+    if (newInodeId == -1 || newBlockId == -1) {
+        std::cerr << "[mkdir] Error: unable to allocate inode or data block." << std::endl;
+        return;
+    }
+
+    // --- STEP 5: Initialize inode structure for the new directory ---
+    Inode newInode{};
+    newInode.id = newInodeId;
+    newInode.is_directory = true;
+    newInode.references = 1;                          // One reference (from parent)
+    newInode.file_size = 2 * sizeof(DirectoryItem);   // Entries: "." and ".."
+    newInode.direct1 = newBlockId;
+    newInode.direct2 = 0;
+    newInode.direct3 = 0;
+    newInode.direct4 = 0;
+    newInode.direct5 = 0;
+    newInode.indirect1 = 0;
+    newInode.indirect2 = 0;
+
+    writeInode(newInodeId, newInode);
+    std::cout << "[mkdir] Allocated inode " << newInodeId
+        << " and data block " << newBlockId
+        << " for directory '" << name << "'." << std::endl;
+
+    // --- STEP 6: Create '.' and '..' directory entries ---
+    DirectoryItem dot{};
+    dot.inode = newInodeId;
+    std::strcpy(dot.item_name, ".");
+
+    DirectoryItem dotdot{};
+    dotdot.inode = parentInodeId;
+    std::strcpy(dotdot.item_name, "..");
+
+    std::fstream fs(filename_, std::ios::in | std::ios::out | std::ios::binary);
+    if (!fs.is_open()) {
+        std::cerr << "[mkdir] Error: cannot open filesystem file to write directory data." << std::endl;
+        return;
+    }
+
+    fs.seekp(dataBlockOffset(newBlockId));
+    fs.write(reinterpret_cast<char*>(&dot), sizeof(DirectoryItem));
+    fs.write(reinterpret_cast<char*>(&dotdot), sizeof(DirectoryItem));
+    fs.close();
+
+    std::cout << "[mkdir] Initialized directory data with '.' and '..'." << std::endl;
+
+    // --- STEP 7: Add the new directory to its parent ---
+    DirectoryItem newEntry{};
+    newEntry.inode = newInodeId;
+    std::strncpy(newEntry.item_name, name.c_str(), sizeof(newEntry.item_name) - 1);
+    newEntry.item_name[sizeof(newEntry.item_name) - 1] = '\0';
+
+    std::fstream fsParent(filename_, std::ios::in | std::ios::out | std::ios::binary);
+    if (!fsParent.is_open()) {
+        std::cerr << "[mkdir] Error: cannot open filesystem file to update parent directory." << std::endl;
+        return;
+    }
+
+    long long offset = dataBlockOffset(parentInode.direct1) + parentInode.file_size;
+    fsParent.seekp(offset);
+    fsParent.write(reinterpret_cast<char*>(&newEntry), sizeof(DirectoryItem));
+    fsParent.close();
+
+    parentInode.file_size += sizeof(DirectoryItem);
+    writeInode(parentInodeId, parentInode);
+
+    std::cout << "[mkdir] Directory '" << name << "' successfully created and added to parent." << std::endl;
+}
