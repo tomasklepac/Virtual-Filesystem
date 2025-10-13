@@ -8,6 +8,7 @@ int main() {
     fs.mkdir("test");
     fs.mkdir("docs");
     fs.mkdir("games");
+	fs.ls();
 
     std::cout << "Filesystem initialized and directories created." << std::endl;
     return 0;

@@ -40,6 +40,7 @@ bool FileSystem::format(int sizeMB) {
     std::vector<char> emptyInodeBitmap(bitmapInodesSize, 0);
     std::vector<char> emptyDataBitmap(bitmapDataSize, 0);
     emptyInodeBitmap[0] = 1; // root inode reserved
+	emptyDataBitmap[0] = 1; // root directory block reserved
 
     file.write(emptyInodeBitmap.data(), bitmapInodesSize);
     file.write(emptyDataBitmap.data(), bitmapDataSize);
@@ -188,7 +189,27 @@ int FileSystem::allocateFreeInode() {
     }
 
     // Load inode bitmap
-    const int bitmapSize = INODE_BITMAP_SIZE;
+    std::vector<char> bitmap(INODE_BITMAP_SIZE);
+    file.seekg(sb.bitmapi_start_adress);
+    file.read(bitmap.data(), INODE_BITMAP_SIZE);
+
+    // Find first free inode (value 0)
+    for (int i = 0; i < INODE_BITMAP_SIZE; ++i) {
+        if (bitmap[i] == 0) {
+            bitmap[i] = 1; // mark as used
+
+            // Write updated bitmap back
+            file.seekp(sb.bitmapi_start_adress);
+            file.write(bitmap.data(), INODE_BITMAP_SIZE);
+            file.close();
+
+            return i; // return allocated inode ID
+        }
+    }
+
+    std::cerr << "No free inodes available." << std::endl;
+    file.close();
+    return -1;
 }
 
 // Allocates a free data block, marks it in the bitmap, and returns its ID
@@ -260,7 +281,7 @@ bool FileSystem::directoryContains(int dirInodeId, const std::string& name) {
 
 // Creates a new directory inside the current working directory (root for now)
 void FileSystem::mkdir(const std::string& name) {
-    const int parentInodeId = 0; // Current working directory (root)
+    const int parentInodeId = currentDirInode_; // Current working directory (root)
 
     // --- STEP 1: Validate input name ---
     if (name.empty()) {
@@ -362,4 +383,149 @@ void FileSystem::mkdir(const std::string& name) {
     writeInode(parentInodeId, parentInode);
 
     std::cout << "[mkdir] Directory '" << name << "' successfully created and added to parent." << std::endl;
+}
+
+// Lists contents of a directory (default: root)
+void FileSystem::ls(const std::string& name) {
+    int targetInodeId = currentDirInode_; // default = root
+
+    // --- STEP 1: If name is specified, find that directory in root ---
+    if (!name.empty()) {
+        Inode root = readInode(0);
+        Superblock sb = readSuperblock();
+
+        std::ifstream file(filename_, std::ios::binary);
+        if (!file.is_open()) {
+            std::cerr << "[ls] Error: cannot open filesystem file." << std::endl;
+            return;
+        }
+
+        file.seekg(dataBlockOffset(root.direct1));
+
+        DirectoryItem item{};
+        int entries = root.file_size / sizeof(DirectoryItem);
+
+        bool found = false;
+        for (int i = 0; i < entries; ++i) {
+            file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
+            if (std::string(item.item_name) == name) {
+                targetInodeId = item.inode;
+                found = true;
+                break;
+            }
+        }
+        file.close();
+
+        if (!found) {
+            std::cerr << "[ls] Error: directory '" << name << "' not found." << std::endl;
+            return;
+        }
+    }
+
+    // --- STEP 2: Load target inode ---
+    Inode dirInode = readInode(targetInodeId);
+    if (!dirInode.is_directory) {
+        std::cerr << "[ls] Error: '" << name << "' is not a directory." << std::endl;
+        return;
+    }
+
+    // --- STEP 3: Read and print contents ---
+    std::ifstream file(filename_, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "[ls] Error: cannot open filesystem file." << std::endl;
+        return;
+    }
+
+    file.seekg(dataBlockOffset(dirInode.direct1));
+
+    DirectoryItem item{};
+    int entries = dirInode.file_size / sizeof(DirectoryItem);
+
+    std::cout << "\nContents of directory '"
+        << (name.empty() ? "/" : name)
+        << "' (inode " << targetInodeId << "):\n";
+
+    for (int i = 0; i < entries; ++i) {
+        file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
+        if (item.inode != 0) {
+            std::cout << " - " << item.item_name;
+            Inode tmp = readInode(item.inode);
+            if (tmp.is_directory)
+                std::cout << "/";
+            std::cout << std::endl;
+        }
+    }
+
+    file.close();
+    std::cout << std::endl;
+}
+
+// Changes the current working directory
+void FileSystem::cd(const std::string& name) {
+    // --- STEP 1: Handle special case: go to parent (cd ..) ---
+    if (name == "..") {
+        Inode current = readInode(currentDirInode_);
+
+        // Read current directory data
+        std::ifstream file(filename_, std::ios::binary);
+        if (!file.is_open()) {
+            std::cerr << "[cd] Error: cannot open filesystem file." << std::endl;
+            return;
+        }
+
+        file.seekg(dataBlockOffset(current.direct1));
+        DirectoryItem item{};
+        file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem)); // "."
+        file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem)); // ".."
+
+        file.close();
+
+        currentDirInode_ = item.inode; // set to parent
+        std::cout << "[cd] Moved to parent directory." << std::endl;
+        return;
+    }
+
+    // --- STEP 2: Read current directory inode ---
+    Inode current = readInode(currentDirInode_);
+    if (!current.is_directory) {
+        std::cerr << "[cd] Error: current inode is not a directory." << std::endl;
+        return;
+    }
+
+    // --- STEP 3: Search for target directory ---
+    std::ifstream file(filename_, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "[cd] Error: cannot open filesystem file." << std::endl;
+        return;
+    }
+
+    file.seekg(dataBlockOffset(current.direct1));
+
+    DirectoryItem item{};
+    int entries = current.file_size / sizeof(DirectoryItem);
+    bool found = false;
+
+    for (int i = 0; i < entries; ++i) {
+        file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
+        if (std::string(item.item_name) == name) {
+            Inode target = readInode(item.inode);
+            if (!target.is_directory) {
+                std::cerr << "[cd] Error: '" << name << "' is not a directory." << std::endl;
+                file.close();
+                return;
+            }
+            currentDirInode_ = item.inode;
+            found = true;
+            break;
+        }
+    }
+
+    file.close();
+
+    if (!found) {
+        std::cerr << "[cd] Error: directory '" << name << "' not found." << std::endl;
+        return;
+    }
+
+    std::cout << "[cd] Moved into directory '" << name << "' (inode " << currentDirInode_ << ")." << std::endl;
 }

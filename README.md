@@ -8,10 +8,10 @@ This project simulates the structure and behavior of a real filesystem inside a 
 ## 🧠 Project Overview
 This project demonstrates core operating system concepts such as:
 - superblock and metadata management,
-- inode table and directory hierarchy,
+- inode table and hierarchical directory structure,
 - virtual data blocks (clusters),
 - formatted disk initialization and allocation,
-- real implementation of filesystem commands (`mkdir`, upcoming `ls`, etc.).
+- real implementation of filesystem commands (`mkdir`, `ls`, `cd`, and more).
 
 The goal is to emulate the low-level mechanisms used in real filesystems (e.g., ext2, MINIX), including binary data layout and direct manipulation of structures on disk.
 
@@ -23,8 +23,10 @@ The goal is to emulate the low-level mechanisms used in real filesystems (e.g., 
 ✅ Create the root directory (inode 0)  
 ✅ Implement the `mkdir` command for creating new directories  
 ✅ Automatic creation of `.` and `..` entries in each new directory  
-✅ Update parent directory with new entries  
-🕓 (Work in progress) — Implementing `ls`, `cd`, and `pwd`
+✅ Implement the `ls` command for listing directory contents  
+✅ Implement the `cd` command for navigating between directories  
+✅ Update parent directory and maintain correct hierarchy  
+🕓 (Upcoming) — Implementing `pwd`, `rm`, and `touch`
 
 ---
 

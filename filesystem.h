@@ -19,6 +19,12 @@ public:
     // Create a new directory inside the current working directory
     void mkdir(const std::string& name);
 
+    // List contents of the current directory (root for now)
+    void ls(const std::string& name = "");
+
+	// Change current working directory
+	void cd(const std::string& name);
+
 private:
     // --- Filesystem layout constants ---
     // All values are in bytes unless stated otherwise.
@@ -53,4 +59,7 @@ private:
 
     // Check if a directory contains an item with the given name
     bool directoryContains(int dirInodeId, const std::string& name);
+
+    // --- Current working directory ---
+    int currentDirInode_ = 0; // Start at root directory (inode 0)
 };
