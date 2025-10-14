@@ -20,7 +20,16 @@
     <ClCompile Include="main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="filesystem.cpp">
+    <ClCompile Include="filesystem_core.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="filesystem_dir.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="filesystem_file.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="filesystem_utils.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

@@ -25,6 +25,21 @@ public:
 	// Change current working directory
 	void cd(const std::string& name);
 
+	// Print the current working directory path
+	void pwd();
+
+	// Create a new empty file inside the current directory
+	void touch(const std::string& name);
+
+	// Display the contents of a file
+	void cat(const std::string& name);
+
+	// Write data to a file (overwrite existing content)
+	void write(const std::string& name, const std::string& content);
+
+	// Delete a file or empty directory
+	void rm(const std::string& name);
+
 private:
     // --- Filesystem layout constants ---
     // All values are in bytes unless stated otherwise.
@@ -33,6 +48,8 @@ private:
     static constexpr int DATA_BITMAP_SIZE = 128;              // 128 bytes => 128 data blocks max
     static constexpr int INODE_TABLE_SIZE = 4096;             // 4 KB reserved for inode table
     static constexpr long long BYTES_PER_MB = 1024LL * 1024LL;  // Bytes in one MB
+
+	int currentDirInode_ = 0; // Current working directory inode (default = root)
 
     // --- Internal state ---
     std::string filename_;  // Name of the binary file (e.g., "myfs.dat")
@@ -60,6 +77,9 @@ private:
     // Check if a directory contains an item with the given name
     bool directoryContains(int dirInodeId, const std::string& name);
 
-    // --- Current working directory ---
-    int currentDirInode_ = 0; // Start at root directory (inode 0)
+	// Return the parent inode ID of a directory
+	int getParentInodeId(int dirInodeId);
+
+	// In parent directory, find the name of the entry that points to childInodeId
+	std::string findNameInParent(int parentInodeId, int childInodeId);
 };
