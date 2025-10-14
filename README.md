@@ -11,7 +11,7 @@ This project demonstrates core operating system concepts such as:
 - inode table and hierarchical directory structure,
 - virtual data blocks (clusters),
 - formatted disk initialization and allocation,
-- real implementation of filesystem commands (`mkdir`, `ls`, `cd`, and more).
+- real implementation of filesystem commands (`mkdir`, `ls`, `cd`, `touch`, `write`, `cat`, `rm`, `pwd`).
 
 The goal is to emulate the low-level mechanisms used in real filesystems (e.g., ext2, MINIX), including binary data layout and direct manipulation of structures on disk.
 
@@ -21,12 +21,17 @@ The goal is to emulate the low-level mechanisms used in real filesystems (e.g., 
 ✅ Create and format a virtual filesystem  
 ✅ Write metadata (superblock, bitmaps, inode table)  
 ✅ Create the root directory (inode 0)  
-✅ Implement the `mkdir` command for creating new directories  
-✅ Automatic creation of `.` and `..` entries in each new directory  
-✅ Implement the `ls` command for listing directory contents  
-✅ Implement the `cd` command for navigating between directories  
-✅ Update parent directory and maintain correct hierarchy  
-🕓 (Upcoming) — Implementing `pwd`, `rm`, and `touch`
+✅ Implement `mkdir` for creating new directories  
+✅ Automatic creation of `.` and `..` entries  
+✅ Implement `ls` for listing directory contents  
+✅ Implement `cd` for directory navigation  
+✅ Implement `pwd` for showing the current working path  
+✅ Implement `touch` for creating new files  
+✅ Implement `write` for writing data into files  
+✅ Implement `cat` for displaying file content  
+✅ Implement `rm` for removing files or empty directories  
+✅ Fully functional interactive user shell with prompt and command handling  
+✅ Modular codebase (`filesystem_core.cpp`, `filesystem_dir.cpp`, `filesystem_file.cpp`) for clarity and maintainability  
 
 ---
 
