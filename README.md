@@ -1,46 +1,84 @@
-# 🗂️ Virtual Filesystem
+# 🗂️ Virtual Filesystem (VFS)
 
-A lightweight virtual filesystem implemented in **C++** as part of the *Operating Systems Fundamentals (ZOS)* course at the University of West Bohemia.  
-This project simulates the structure and behavior of a real filesystem inside a single binary file (`myfs.dat`).
+A lightweight virtual filesystem implemented in **C++** as part of the *Operating Systems Fundamentals (ZOS)* course at the **University of West Bohemia**.  
+It simulates the structure and behavior of a simple UNIX-like filesystem inside a single binary file (`myfs.dat`).
 
 ---
 
-## 🧠 Project Overview
-This project demonstrates core operating system concepts such as:
+## 🧠 Overview
+The project demonstrates key operating system concepts, including:
 - superblock and metadata management,
-- inode table and hierarchical directory structure,
-- virtual data blocks (clusters),
-- formatted disk initialization and allocation,
-- real implementation of filesystem commands (`mkdir`, `ls`, `cd`, `touch`, `write`, `cat`, `rm`, `pwd`).
+- inode table and hierarchical directories,
+- virtual data block allocation,
+- file and directory operations with persistent structure,
+- import/export between the virtual and host filesystem.
 
-The goal is to emulate the low-level mechanisms used in real filesystems (e.g., ext2, MINIX), including binary data layout and direct manipulation of structures on disk.
-
----
-
-## 🧩 Current Features
-✅ Create and format a virtual filesystem  
-✅ Write metadata (superblock, bitmaps, inode table)  
-✅ Create the root directory (inode 0)  
-✅ Implement `mkdir` for creating new directories  
-✅ Automatic creation of `.` and `..` entries  
-✅ Implement `ls` for listing directory contents  
-✅ Implement `cd` for directory navigation  
-✅ Implement `pwd` for showing the current working path  
-✅ Implement `touch` for creating new files  
-✅ Implement `write` for writing data into files  
-✅ Implement `cat` for displaying file content  
-✅ Implement `rm` for removing files or empty directories  
-✅ Fully functional interactive user shell with prompt and command handling  
-✅ Modular codebase (`filesystem_core.cpp`, `filesystem_dir.cpp`, `filesystem_file.cpp`) for clarity and maintainability  
+The goal is to emulate low-level filesystem mechanisms (similar to ext2/MINIX) using direct binary manipulation.
 
 ---
 
-## ⚙️ Build and Run
-**Requirements**
-- Visual Studio 2022 (C++ workload installed)
-- Windows 10 or later
+## ✨ Features
+✅ Filesystem formatting with metadata initialization  
+✅ Hierarchical directory management (`mkdir`, `rmdir`, `cd`, `ls`, `pwd`)  
+✅ File manipulation (`touch`, `write`, `cat`, `rm`, `info`)  
+✅ Advanced operations (`cp`, `mv`, `xcp`, `add`)  
+✅ Host filesystem integration (`incp`, `outcp`)  
+✅ System statistics via `statfs`  
+✅ Script execution via `load`  
+✅ Clean modular structure (`core`, `dir`, `file`)  
 
-**Steps to build:**
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/<your-username>/VirtualFilesystem.git
+---
+
+## ⚙️ Build & Run
+### Requirements
+- **C++17** or newer  
+- **Visual Studio 2022** (or any modern C++ compiler)  
+- **Windows 10 / Linux (WSL)** compatible  
+
+### Steps
+```bash
+git clone https://github.com/<your-username>/VirtualFilesystem.git
+cd VirtualFilesystem
+```
+
+Then compile and run:
+```bash
+g++ -std=c++17 main.cpp filesystem_core.cpp filesystem_dir.cpp filesystem_file.cpp -o vfs
+./vfs
+```
+
+---
+
+## 💡 Example Usage
+```bash
+format 5
+mkdir test
+cd test
+touch notes.txt
+write notes.txt Hello_World!
+cat notes.txt
+ls
+info notes.txt
+statfs
+```
+
+---
+
+## 🧩 Project Structure
+```
+📁 VirtualFilesystem
+ ┣ 📄 main.cpp                 → interactive shell interface
+ ┣ 📄 filesystem_core.cpp      → core structures, allocation, format
+ ┣ 📄 filesystem_dir.cpp       → directory operations
+ ┣ 📄 filesystem_file.cpp      → file operations
+ ┣ 📄 filesystem.h             → class definition
+ ┣ 📄 structures.h             → core structures (Superblock, Inode)
+ ┗ 📄 README.md                → documentation
+```
+
+---
+
+## 🧾 Author
+**Tomáš Klepač**  
+Faculty of Applied Sciences (FAV) – University of West Bohemia  
+2025
