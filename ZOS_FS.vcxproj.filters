@@ -29,9 +29,6 @@
     <ClCompile Include="filesystem_file.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="filesystem_utils.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="filesystem.h">

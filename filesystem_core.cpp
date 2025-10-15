@@ -1,11 +1,13 @@
 // =============================================
 // filesystem_core.cpp
 // ---------------------------------------------
-// Low-level filesystem operations
-// Responsible for:
-//   - Creating and formatting the virtual disk
-//   - Reading/writing inodes and superblock
-//   - Managing inode/data bitmaps and block offsets
+// Core filesystem operations
+// Handles:
+//   - Superblock and bitmap management
+//   - Inode read/write
+//   - Block allocation and freeing
+//   - Filesystem formatting
+//   - Core system commands (statfs, load)
 // =============================================
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -15,13 +17,15 @@
 #include <vector>
 #include <cstring>
 #include <filesystem>
+#include <sstream>
 
 // -------------------------------------------------
 // format
 // -------------------------------------------------
-// Creates a new virtual filesystem file and initializes:
+// Performs formatting of the virtual filesystem file.
+// Initializes all core structures including:
 //   - Superblock
-//   - Bitmaps
+//   - Inode and data bitmaps
 //   - Inode table
 //   - Root directory (inode 0)
 // -------------------------------------------------
@@ -93,8 +97,7 @@ bool FileSystem::format(int sizeMB) {
         return false;
     }
 
-    std::cout << "[core] Filesystem formatted (" << sizeMB << " MB)\n";
-    std::cout << "[core] Root directory (inode 0) created.\n";
+    std::cout << "OK\n";
 
     currentDirInode_ = 0; // reset working directory
     return true;
@@ -103,7 +106,8 @@ bool FileSystem::format(int sizeMB) {
 // -------------------------------------------------
 // printSuperblock
 // -------------------------------------------------
-// Prints superblock metadata information to console.
+// Displays the metadata stored in the superblock
+// for debugging and verification purposes.
 // -------------------------------------------------
 void FileSystem::printSuperblock() {
     std::ifstream file(filename_, std::ios::binary);
@@ -132,6 +136,8 @@ void FileSystem::printSuperblock() {
 // -------------------------------------------------
 // readSuperblock
 // -------------------------------------------------
+// Loads and returns the current superblock from disk.
+// --------------------------------------------------
 Superblock FileSystem::readSuperblock() {
     std::ifstream file(filename_, std::ios::binary);
     Superblock sb{};
@@ -146,6 +152,8 @@ Superblock FileSystem::readSuperblock() {
 
 // -------------------------------------------------
 // readInode
+// -------------------------------------------------
+// Reads a specific inode structure by its ID from disk.
 // -------------------------------------------------
 Inode FileSystem::readInode(int inodeId) {
     Superblock sb = readSuperblock();
@@ -167,6 +175,8 @@ Inode FileSystem::readInode(int inodeId) {
 // -------------------------------------------------
 // writeInode
 // -------------------------------------------------
+// Writes an inode structure to its correct position on disk.
+// -------------------------------------------------
 void FileSystem::writeInode(int inodeId, const Inode& inode) {
     Superblock sb = readSuperblock();
     std::fstream file(filename_, std::ios::in | std::ios::out | std::ios::binary);
@@ -185,7 +195,8 @@ void FileSystem::writeInode(int inodeId, const Inode& inode) {
 // -------------------------------------------------
 // allocateFreeInode
 // -------------------------------------------------
-// Finds the first free inode in the bitmap, marks it as used, and returns its ID.
+// Searches for a free inode in the bitmap,
+// marks it as used, and returns its ID.
 // -------------------------------------------------
 int FileSystem::allocateFreeInode() {
     Superblock sb = readSuperblock();
@@ -209,13 +220,16 @@ int FileSystem::allocateFreeInode() {
         }
     }
 
-    std::cerr << "[alloc] Error: no free inodes available.\n";
+    std::cerr << "NO SPACE\n";
     file.close();
     return -1;
 }
 
 // -------------------------------------------------
 // allocateFreeDataBlock
+// -------------------------------------------------
+// Searches for a free data block in the bitmap,
+// marks it as used, and returns its block ID.
 // -------------------------------------------------
 int FileSystem::allocateFreeDataBlock() {
     Superblock sb = readSuperblock();
@@ -239,7 +253,7 @@ int FileSystem::allocateFreeDataBlock() {
         }
     }
 
-    std::cerr << "[alloc] Error: no free data blocks available.\n";
+    std::cerr << "NO SPACE\n";
     file.close();
     return -1;
 }
@@ -247,6 +261,9 @@ int FileSystem::allocateFreeDataBlock() {
 // -------------------------------------------------
 // dataBlockOffset
 // -------------------------------------------------
+// Computes the absolute byte offset of a data block
+// within the virtual filesystem file.
+// --------------------------------------------------
 long long FileSystem::dataBlockOffset(int blockId) {
     Superblock sb = readSuperblock();
     return static_cast<long long>(sb.data_start_adress)
@@ -256,12 +273,13 @@ long long FileSystem::dataBlockOffset(int blockId) {
 // -------------------------------------------------
 // directoryContains
 // -------------------------------------------------
-// Checks if a directory contains an item with the specified name.
+// Checks if a directory contains an item
+// with the given name.
 // -------------------------------------------------
 bool FileSystem::directoryContains(int dirInodeId, const std::string& name) {
     Inode dirInode = readInode(dirInodeId);
     if (!dirInode.is_directory) {
-        std::cerr << "[core] Error: inode " << dirInodeId << " is not a directory.\n";
+        std::cerr << "PATH NOT FOUND\n";
         return false;
     }
 
@@ -286,4 +304,109 @@ bool FileSystem::directoryContains(int dirInodeId, const std::string& name) {
 
     file.close();
     return false;
+}
+
+// -------------------------------------------------
+// statfs
+// -------------------------------------------------
+// Prints overall filesystem statistics such as
+// used/free inodes, data blocks, and directory count.
+// -------------------------------------------------
+void FileSystem::statfs() {
+    Superblock sb = readSuperblock();
+
+    std::ifstream file(filename_, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "[statfs] Error: cannot open filesystem file.\n";
+        return;
+    }
+
+    // --- Read bitmaps ---
+    std::vector<char> inodeBitmap(INODE_BITMAP_SIZE);
+    std::vector<char> dataBitmap(DATA_BITMAP_SIZE);
+    file.seekg(sb.bitmapi_start_adress);
+    file.read(inodeBitmap.data(), INODE_BITMAP_SIZE);
+    file.seekg(sb.bitmap_start_adress);
+    file.read(dataBitmap.data(), DATA_BITMAP_SIZE);
+
+    // --- Count used and free bits ---
+    int usedInodes = 0, usedBlocks = 0;
+    for (char bit : inodeBitmap) if (bit == 1) usedInodes++;
+    for (char bit : dataBitmap) if (bit == 1) usedBlocks++;
+
+    int freeInodes = INODE_BITMAP_SIZE - usedInodes;
+    int freeBlocks = DATA_BITMAP_SIZE - usedBlocks;
+
+    // --- Count directories ---
+    int directoryCount = 0;
+    file.seekg(sb.inode_start_adress);
+    const int inodeCount = INODE_TABLE_SIZE / sizeof(Inode);
+    for (int i = 0; i < inodeCount; ++i) {
+        Inode inode{};
+        file.read(reinterpret_cast<char*>(&inode), sizeof(Inode));
+        if (inode.is_directory && inode.id != 0)
+            directoryCount++;
+    }
+
+    file.close();
+
+    // --- Print results ---
+    std::cout << "\nFilesystem statistics:\n";
+    std::cout << "- Disk size: " << sb.disk_size << " bytes\n";
+    std::cout << "- Cluster size: " << sb.cluster_size << " bytes\n";
+    std::cout << "- Used inodes: " << usedInodes << " / " << INODE_BITMAP_SIZE << "\n";
+    std::cout << "- Free inodes: " << freeInodes << "\n";
+    std::cout << "- Used data blocks: " << usedBlocks << " / " << DATA_BITMAP_SIZE << "\n";
+    std::cout << "- Free data blocks: " << freeBlocks << "\n";
+    std::cout << "- Directories: " << directoryCount << "\n\n";
+}
+
+// -------------------------------------------------
+// load
+// -------------------------------------------------
+// Executes a batch of commands from a text file
+// located on the host filesystem.
+// -------------------------------------------------
+void FileSystem::load(const std::string& hostFilePath) {
+    std::ifstream script(hostFilePath);
+    if (!script.is_open()) {
+        std::cerr << "FILE NOT FOUND\n";
+        return;
+    }
+
+    std::string line;
+    while (std::getline(script, line)) {
+        // pøeskoè prázdné øádky nebo komentáøe (#)
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        std::istringstream iss(line);
+        std::string cmd, arg1, arg2, arg3;
+        iss >> cmd >> arg1 >> arg2 >> arg3;
+
+        // --- základní parser pøíkazù ---
+        if (cmd == "format") { int n = std::stoi(arg1); format(n); }
+        else if (cmd == "mkdir") mkdir(arg1);
+        else if (cmd == "rmdir") rmdir(arg1);
+        else if (cmd == "ls") ls();
+        else if (cmd == "cd") cd(arg1);
+        else if (cmd == "pwd") pwd();
+        else if (cmd == "touch") touch(arg1);
+        else if (cmd == "write") write(arg1, arg2);
+        else if (cmd == "cat") cat(arg1);
+        else if (cmd == "rm") rm(arg1);
+        else if (cmd == "cp") cp(arg1, arg2);
+        else if (cmd == "mv") mv(arg1, arg2);
+        else if (cmd == "info") info(arg1);
+        else if (cmd == "statfs") statfs();
+        else if (cmd == "incp") incp(arg1, arg2);
+        else if (cmd == "outcp") outcp(arg1, arg2);
+        else if (cmd == "xcp") xcp(arg1, arg2, arg3);
+        else if (cmd == "add") add(arg1, arg2);
+        else if (cmd == "exit") { std::cout << "Terminating script.\n"; break; }
+        else std::cerr << "UNKNOWN COMMAND\n";
+    }
+
+    script.close();
+    std::cout << "OK\n";
 }

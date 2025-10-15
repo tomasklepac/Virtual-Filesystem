@@ -132,7 +132,6 @@
     <ClCompile Include="filesystem_core.cpp" />
     <ClCompile Include="filesystem_dir.cpp" />
     <ClCompile Include="filesystem_file.cpp" />
-    <ClCompile Include="filesystem_utils.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

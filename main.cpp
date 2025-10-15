@@ -4,16 +4,23 @@
 #include <string>
 #include <vector>
 
-// Helper function to capture the current path as string
+// =============================================
+// main.cpp
+// ---------------------------------------------
+// Command-line shell for interacting with the
+// virtual filesystem (FileSystem class).
+// Supports basic file and directory operations,
+// import/export, and batch command execution.
+// =============================================
+
+// Helper function to capture the current working path
 std::string getCurrentPath(FileSystem& fs) {
-    // Redirect cout temporarily to capture fs.pwd() output
     std::ostringstream buffer;
     std::streambuf* oldCout = std::cout.rdbuf(buffer.rdbuf());
     fs.pwd();
     std::cout.rdbuf(oldCout);
     std::string path = buffer.str();
 
-    // Remove newline from end
     if (!path.empty() && path.back() == '\n')
         path.pop_back();
 
@@ -22,99 +29,101 @@ std::string getCurrentPath(FileSystem& fs) {
 
 int main() {
     FileSystem fs("myfs.dat");
-    std::string input, cmd, arg;
+    std::string input;
 
-    std::cout << "===== Virtual Filesystem Shell =====" << std::endl;
-    std::cout << "Type 'help' to see available commands." << std::endl;
+    std::cout << "===== Virtual Filesystem Shell =====\n";
+    std::cout << "Type 'help' for a list of commands.\n\n";
 
     while (true) {
         std::string path = getCurrentPath(fs);
         std::cout << path << "> ";
-        std::getline(std::cin, input);
+
+        if (!std::getline(std::cin, input))
+            break;
 
         std::istringstream iss(input);
-        std::string cmd, arg1;
-        iss >> cmd >> arg1;
+        std::string cmd, arg1, arg2, arg3;
+        iss >> cmd >> arg1 >> arg2 >> arg3;
 
         if (cmd.empty()) continue;
 
+        // ---------------- exit ----------------
         if (cmd == "exit") {
-            std::cout << "Exiting filesystem shell." << std::endl;
+            std::cout << "Terminating shell.\n";
             break;
         }
 
+        // ---------------- help ----------------
         else if (cmd == "help") {
-            std::cout << "Available commands:\n"
-                << " format [sizeMB]   - create new filesystem\n"
-                << " mkdir [name]      - create directory\n"
-                << " ls [name]         - list directory contents\n"
-                << " cd [name]         - change directory (use .. to go up)\n"
-                << " pwd               - show current path\n"
-                << " exit              - quit program\n";
+            std::cout
+                << "\nAvailable commands:\n"
+                << " format [MB]          - create new filesystem\n"
+                << " mkdir [name]         - create directory\n"
+                << " rmdir [name]         - remove empty directory\n"
+                << " ls [name]            - list directory contents\n"
+                << " cd [name]            - change directory (.. to go up)\n"
+                << " pwd                  - print current path\n"
+                << " touch [file]         - create empty file\n"
+                << " write [file] [text]  - overwrite file content\n"
+                << " cat [file]           - show file content\n"
+                << " rm [file]            - delete file\n"
+                << " cp [src] [dst]       - copy file\n"
+                << " mv [src] [dst]       - move or rename file\n"
+                << " info [item]          - show file/dir metadata\n"
+                << " statfs               - show filesystem stats\n"
+                << " incp [host] [vfs]    - import file from host\n"
+                << " outcp [vfs] [host]   - export file to host\n"
+                << " xcp [f1] [f2] [out]  - concatenate two files\n"
+                << " add [f1] [f2]        - append f2 to f1\n"
+                << " load [script]        - execute batch commands\n"
+                << " exit                 - quit program\n\n";
         }
 
+        // ---------------- format ----------------
         else if (cmd == "format") {
-            if (arg1.empty()) {
-                std::cerr << "Usage: format [sizeMB]" << std::endl;
-            }
-            else {
-                int size = std::stoi(arg1);
-                fs.format(size);
-            }
+            if (arg1.empty()) std::cerr << "Usage: format [sizeMB]\n";
+            else fs.format(std::stoi(arg1));
         }
 
-        else if (cmd == "mkdir") {
-            if (arg1.empty()) std::cerr << "Usage: mkdir [name]" << std::endl;
-            else fs.mkdir(arg1);
-        }
+        // ---------------- directory commands ----------------
+        else if (cmd == "mkdir") { if (arg1.empty()) std::cerr << "Usage: mkdir [name]\n"; else fs.mkdir(arg1); }
+        else if (cmd == "rmdir") { if (arg1.empty()) std::cerr << "Usage: rmdir [name]\n"; else fs.rmdir(arg1); }
+        else if (cmd == "ls") { fs.ls(arg1); }
+        else if (cmd == "cd") { if (arg1.empty()) std::cerr << "Usage: cd [name]\n"; else fs.cd(arg1); }
+        else if (cmd == "pwd") { fs.pwd(); }
 
-        else if (cmd == "ls") {
-            fs.ls(arg1);
-        }
-
-        else if (cmd == "cd") {
-            if (arg1.empty()) std::cerr << "Usage: cd [name]" << std::endl;
-            else fs.cd(arg1);
-        }
-
-        else if (cmd == "pwd") {
-            fs.pwd();
-        }
-
-        else if (cmd == "touch") {
-            if (arg1.empty()) std::cerr << "Usage: touch [filename]" << std::endl;
-            else fs.touch(arg1);
-        }
-
-        else if (cmd == "cat") {
-            if (arg1.empty()) std::cerr << "Usage: cat [filename]" << std::endl;
-            else fs.cat(arg1);
-        }
+        // ---------------- file commands ----------------
+        else if (cmd == "touch") { if (arg1.empty()) std::cerr << "Usage: touch [file]\n"; else fs.touch(arg1); }
+        else if (cmd == "cat") { if (arg1.empty()) std::cerr << "Usage: cat [file]\n"; else fs.cat(arg1); }
 
         else if (cmd == "write") {
             std::string filename, text;
-            std::istringstream iss(input);
-            iss >> cmd >> filename;
-            std::getline(iss, text);
-
-            // Remove leading space before text
+            std::istringstream iss2(input);
+            iss2 >> cmd >> filename;
+            std::getline(iss2, text);
             if (!text.empty() && text[0] == ' ') text.erase(0, 1);
-
-            if (filename.empty()) {
-                std::cerr << "Usage: write [filename] [text]" << std::endl;
-            }
-            else {
-                fs.write(filename, text);
-            }
+            if (filename.empty()) std::cerr << "Usage: write [file] [text]\n";
+            else fs.write(filename, text);
         }
 
-        else if (cmd == "rm") {
-            if (arg1.empty()) std::cerr << "Usage: rm [name]" << std::endl;
-            else fs.rm(arg1);
-        }
+        else if (cmd == "rm") { if (arg1.empty()) std::cerr << "Usage: rm [file]\n"; else fs.rm(arg1); }
+        else if (cmd == "info") { if (arg1.empty()) std::cerr << "Usage: info [item]\n"; else fs.info(arg1); }
+        else if (cmd == "statfs") { fs.statfs(); }
 
+        // ---------------- file manipulation ----------------
+        else if (cmd == "cp") { if (arg1.empty() || arg2.empty()) std::cerr << "Usage: cp [src] [dst]\n"; else fs.cp(arg1, arg2); }
+        else if (cmd == "mv") { if (arg1.empty() || arg2.empty()) std::cerr << "Usage: mv [src] [dst]\n"; else fs.mv(arg1, arg2); }
+        else if (cmd == "xcp") { if (arg1.empty() || arg2.empty() || arg3.empty()) std::cerr << "Usage: xcp [f1] [f2] [out]\n"; else fs.xcp(arg1, arg2, arg3); }
+        else if (cmd == "add") { if (arg1.empty() || arg2.empty()) std::cerr << "Usage: add [f1] [f2]\n"; else fs.add(arg1, arg2); }
+
+        // ---------------- host integration ----------------
+        else if (cmd == "incp") { if (arg1.empty() || arg2.empty()) std::cerr << "Usage: incp [host] [vfs]\n"; else fs.incp(arg1, arg2); }
+        else if (cmd == "outcp") { if (arg1.empty() || arg2.empty()) std::cerr << "Usage: outcp [vfs] [host]\n"; else fs.outcp(arg1, arg2); }
+        else if (cmd == "load") { if (arg1.empty()) std::cerr << "Usage: load [script]\n"; else fs.load(arg1); }
+
+        // ---------------- fallback ----------------
         else {
-            std::cerr << "Unknown command: " << cmd << std::endl;
+            std::cerr << "Unknown command: " << cmd << "\n";
         }
     }
 

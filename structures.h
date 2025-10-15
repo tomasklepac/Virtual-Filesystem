@@ -1,36 +1,45 @@
 #pragma once
 #include <cstdint>
 
-const int32_t ID_ITEM_FREE = 0;
+// =============================================
+// structures.h
+// ---------------------------------------------
+// Defines all core data structures used by the
+// virtual filesystem, including the Superblock,
+// Inode, and DirectoryItem.
+// =============================================
+
+// Constant representing an unused directory entry
+constexpr int32_t ID_ITEM_FREE = 0;
 
 // ---------------- Superblock ----------------
-// Contains global information about the entire filesystem.
+// Contains global metadata about the entire filesystem layout.
 struct Superblock {
-    char signature[9];              // author/login
-    char volume_descriptor[251];    // short filesystem description
-    int32_t disk_size;              // total disk size in bytes
-    int32_t cluster_size;           // size of one cluster (e.g., 1024 bytes)
-    int32_t cluster_count;          // total number of clusters
-    int32_t bitmapi_start_adress;   // offset (in bytes) to the inode bitmap
-    int32_t bitmap_start_adress;    // offset (in bytes) to the data bitmap
-    int32_t inode_start_adress;     // offset (in bytes) to the inode table
-    int32_t data_start_adress;      // offset (in bytes) to the data area
+    char signature[9];               // Author or system signature (null-terminated)
+    char volume_descriptor[251];     // Short human-readable volume description
+    int32_t disk_size;               // Total size of the virtual disk (bytes)
+    int32_t cluster_size;            // Size of one cluster (bytes)
+    int32_t cluster_count;           // Total number of clusters
+    int32_t bitmapi_start_adress;   // Byte offset to the inode bitmap
+    int32_t bitmap_start_adress;    // Byte offset to the data bitmap
+    int32_t inode_start_adress;     // Byte offset to the inode table
+    int32_t data_start_adress;      // Byte offset to the data area
 };
 
 // ---------------- Inode ----------------
-// Describes a single file or directory (metadata only).
+// Describes a single file or directory (its metadata only).
 struct Inode {
-    int32_t id;              // inode ID (unique identifier)
-    bool is_directory;       // true = directory, false = file
-    int8_t references;       // number of hard links (references)
-    int32_t file_size;       // file size in bytes
-    int32_t direct1, direct2, direct3, direct4, direct5; // direct data block addresses
-    int32_t indirect1, indirect2; // indirect addresses (for larger files)
+    int32_t id;               // Inode ID (unique identifier)
+    bool is_directory;        // True if this inode represents a directory
+    int8_t references;        // Number of hard links referencing this inode
+    int32_t file_size;        // File size in bytes (or directory entry count * sizeof(DirectoryItem))
+    int32_t direct1, direct2, direct3, direct4, direct5; // Direct data block addresses
+    int32_t indirect1, indirect2; // Indirect block addresses (for larger files)
 };
 
 // ---------------- DirectoryItem ----------------
-// Connects a filename to its corresponding inode.
+// Maps a name to its corresponding inode.
 struct DirectoryItem {
-    int32_t inode;           // ID of the inode this item refers to
-    char item_name[12];      // file or directory name
+    int32_t inode;            // ID of the referenced inode
+    char item_name[12];       // File or directory name (null-terminated, max 11 chars)
 };
