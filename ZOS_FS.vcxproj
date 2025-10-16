@@ -129,14 +129,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="filesystem_core.cpp" />
-    <ClCompile Include="filesystem_dir.cpp" />
-    <ClCompile Include="filesystem_file.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\filesystem_core.cpp" />
+    <ClCompile Include="src\filesystem_dir.cpp" />
+    <ClCompile Include="src\filesystem_file.cpp" />
+    <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="filesystem.h" />
-    <ClInclude Include="structures.h" />
+    <ClInclude Include="src\filesystem.h" />
+    <ClInclude Include="src\structures.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
