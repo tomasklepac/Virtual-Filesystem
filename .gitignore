@@ -13,6 +13,16 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
+# --- Custom rules for ZOS_FS project ---
+# Local test binaries
+bin/
+# Virtual filesystem disk files
+data/*.dat
+# Any logs or temporary debug files
+*.log
+*.tmp
+
+
 # Mono auto generated files
 mono_crash.*
 

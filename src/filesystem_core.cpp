@@ -104,36 +104,6 @@ bool FileSystem::format(int sizeMB) {
 }
 
 // -------------------------------------------------
-// printSuperblock
-// -------------------------------------------------
-// Displays the metadata stored in the superblock
-// for debugging and verification purposes.
-// -------------------------------------------------
-void FileSystem::printSuperblock() {
-    std::ifstream file(filename_, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "[core] Error: cannot open filesystem file.\n";
-        return;
-    }
-
-    Superblock sb{};
-    file.read(reinterpret_cast<char*>(&sb), sizeof(Superblock));
-    file.close();
-
-    std::cout << "\n----- Superblock Information -----\n";
-    std::cout << "Signature: " << sb.signature << "\n";
-    std::cout << "Volume descriptor: " << sb.volume_descriptor << "\n";
-    std::cout << "Disk size: " << sb.disk_size << " bytes\n";
-    std::cout << "Cluster size: " << sb.cluster_size << " bytes\n";
-    std::cout << "Cluster count: " << sb.cluster_count << "\n";
-    std::cout << "Inode bitmap start: " << sb.bitmapi_start_adress << "\n";
-    std::cout << "Data bitmap start: " << sb.bitmap_start_adress << "\n";
-    std::cout << "Inode table start: " << sb.inode_start_adress << "\n";
-    std::cout << "Data area start: " << sb.data_start_adress << "\n";
-    std::cout << "----------------------------------\n";
-}
-
-// -------------------------------------------------
 // readSuperblock
 // -------------------------------------------------
 // Loads and returns the current superblock from disk.
