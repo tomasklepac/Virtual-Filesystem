@@ -61,8 +61,8 @@ bool FileSystem::format(int sizeMB) {
     // --- STEP 4: Initialize bitmaps ---
     std::vector<char> inodeBitmap(INODE_BITMAP_SIZE, 0);
     std::vector<char> dataBitmap(DATA_BITMAP_SIZE, 0);
-    inodeBitmap[0] = 1; // root inode reserved
-    dataBitmap[0] = 1;  // root data block reserved
+    inodeBitmap[0] = 0x01; // bit 0 set for root inode (binary: 00000001)
+    dataBitmap[0] = 0x01;  // bit 0 set for root data block (binary: 00000001)
     file.write(inodeBitmap.data(), INODE_BITMAP_SIZE);
     file.write(dataBitmap.data(), DATA_BITMAP_SIZE);
 
@@ -193,13 +193,17 @@ int FileSystem::allocateFreeInode() {
     file.seekg(sb.bitmapi_start_address);
     file.read(bitmap.data(), INODE_BITMAP_SIZE);
 
-    for (int i = 0; i < INODE_BITMAP_SIZE; ++i) {
-        if (bitmap[i] == 0) {
-            bitmap[i] = 1;
-            file.seekp(sb.bitmapi_start_address);
-            file.write(bitmap.data(), INODE_BITMAP_SIZE);
-            file.close();
-            return i;
+    // Search for free bit in bitmap
+    for (int byteIdx = 0; byteIdx < INODE_BITMAP_SIZE; ++byteIdx) {
+        for (int bitIdx = 0; bitIdx < 8; ++bitIdx) {
+            if ((bitmap[byteIdx] & (1 << bitIdx)) == 0) {
+                // Found free bit
+                bitmap[byteIdx] |= (1 << bitIdx);
+                file.seekp(sb.bitmapi_start_address);
+                file.write(bitmap.data(), INODE_BITMAP_SIZE);
+                file.close();
+                return byteIdx * 8 + bitIdx;
+            }
         }
     }
 
@@ -226,13 +230,17 @@ int FileSystem::allocateFreeDataBlock() {
     file.seekg(sb.bitmap_start_address);
     file.read(bitmap.data(), DATA_BITMAP_SIZE);
 
-    for (int i = 0; i < DATA_BITMAP_SIZE; ++i) {
-        if (bitmap[i] == 0) {
-            bitmap[i] = 1;
-            file.seekp(sb.bitmap_start_address);
-            file.write(bitmap.data(), DATA_BITMAP_SIZE);
-            file.close();
-            return i;
+    // Search for free bit in bitmap
+    for (int byteIdx = 0; byteIdx < DATA_BITMAP_SIZE; ++byteIdx) {
+        for (int bitIdx = 0; bitIdx < 8; ++bitIdx) {
+            if ((bitmap[byteIdx] & (1 << bitIdx)) == 0) {
+                // Found free bit
+                bitmap[byteIdx] |= (1 << bitIdx);
+                file.seekp(sb.bitmap_start_address);
+                file.write(bitmap.data(), DATA_BITMAP_SIZE);
+                file.close();
+                return byteIdx * 8 + bitIdx;
+            }
         }
     }
 
@@ -314,11 +322,21 @@ void FileSystem::statfs() {
 
     // --- Count used and free bits ---
     int usedInodes = 0, usedBlocks = 0;
-    for (char bit : inodeBitmap) if (bit == 1) usedInodes++;
-    for (char bit : dataBitmap) if (bit == 1) usedBlocks++;
+    for (char byte : inodeBitmap) {
+        for (int i = 0; i < 8; ++i) {
+            if (byte & (1 << i)) usedInodes++;
+        }
+    }
+    for (char byte : dataBitmap) {
+        for (int i = 0; i < 8; ++i) {
+            if (byte & (1 << i)) usedBlocks++;
+        }
+    }
 
-    int freeInodes = INODE_BITMAP_SIZE - usedInodes;
-    int freeBlocks = DATA_BITMAP_SIZE - usedBlocks;
+    int totalInodes = INODE_BITMAP_SIZE * 8;
+    int totalBlocks = DATA_BITMAP_SIZE * 8;
+    int freeInodes = totalInodes - usedInodes;
+    int freeBlocks = totalBlocks - usedBlocks;
 
     // --- Count directories ---
     int directoryCount = 0;
@@ -337,9 +355,9 @@ void FileSystem::statfs() {
     std::cout << "\nFilesystem statistics:\n";
     std::cout << "- Disk size: " << sb.disk_size << " bytes\n";
     std::cout << "- Cluster size: " << sb.cluster_size << " bytes\n";
-    std::cout << "- Used inodes: " << usedInodes << " / " << INODE_BITMAP_SIZE << "\n";
+    std::cout << "- Used inodes: " << usedInodes << " / " << totalInodes << "\n";
     std::cout << "- Free inodes: " << freeInodes << "\n";
-    std::cout << "- Used data blocks: " << usedBlocks << " / " << DATA_BITMAP_SIZE << "\n";
+    std::cout << "- Used data blocks: " << usedBlocks << " / " << totalBlocks << "\n";
     std::cout << "- Free data blocks: " << freeBlocks << "\n";
     std::cout << "- Directories: " << directoryCount << "\n\n";
 }

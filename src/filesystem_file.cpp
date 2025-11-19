@@ -445,18 +445,69 @@ void FileSystem::rm(const std::string& name) {
     file.seekg(sb.bitmap_start_address);
     file.read(dataBitmap.data(), DATA_BITMAP_SIZE);
 
-    if (target.direct1 > 0 && target.direct1 < DATA_BITMAP_SIZE) {
-        dataBitmap[target.direct1] = 0;
-        file.seekp(sb.bitmap_start_address);
-        file.write(dataBitmap.data(), DATA_BITMAP_SIZE);
+    // Free all data blocks used by this file
+    if (target.direct1 > 0) {
+        int byteIdx = target.direct1 / 8;
+        int bitIdx = target.direct1 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
     }
+    if (target.direct2 > 0) {
+        int byteIdx = target.direct2 / 8;
+        int bitIdx = target.direct2 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    if (target.direct3 > 0) {
+        int byteIdx = target.direct3 / 8;
+        int bitIdx = target.direct3 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    if (target.direct4 > 0) {
+        int byteIdx = target.direct4 / 8;
+        int bitIdx = target.direct4 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    if (target.direct5 > 0) {
+        int byteIdx = target.direct5 / 8;
+        int bitIdx = target.direct5 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    if (target.indirect1 > 0) {
+        int byteIdx = target.indirect1 / 8;
+        int bitIdx = target.indirect1 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    if (target.indirect2 > 0) {
+        int byteIdx = target.indirect2 / 8;
+        int bitIdx = target.indirect2 % 8;
+        if (byteIdx < DATA_BITMAP_SIZE) {
+            dataBitmap[byteIdx] &= ~(1 << bitIdx);
+        }
+    }
+    
+    file.seekp(sb.bitmap_start_address);
+    file.write(dataBitmap.data(), DATA_BITMAP_SIZE);
 
     std::vector<char> inodeBitmap(INODE_BITMAP_SIZE);
     file.seekg(sb.bitmapi_start_address);
     file.read(inodeBitmap.data(), INODE_BITMAP_SIZE);
 
-    if (targetInodeId < INODE_BITMAP_SIZE) {
-        inodeBitmap[targetInodeId] = 0;
+    // Free the inode
+    int inodeByteIdx = targetInodeId / 8;
+    int inodeBitIdx = targetInodeId % 8;
+    if (inodeByteIdx < INODE_BITMAP_SIZE) {
+        inodeBitmap[inodeByteIdx] &= ~(1 << inodeBitIdx);
         file.seekp(sb.bitmapi_start_address);
         file.write(inodeBitmap.data(), INODE_BITMAP_SIZE);
     }
