@@ -75,17 +75,23 @@ bool FileSystem::format(int sizeMB) {
     inodeTable[0].id = 0;
     inodeTable[0].is_directory = true;
     inodeTable[0].references = 1;
-    inodeTable[0].file_size = sizeof(DirectoryItem);
+    inodeTable[0].file_size = 2 * sizeof(DirectoryItem);  // "." and ".."
     inodeTable[0].direct1 = 0;
 
     file.write(reinterpret_cast<char*>(inodeTable.data()), INODE_TABLE_SIZE);
 
     // --- STEP 6: Create root directory block ---
-    DirectoryItem root{};
-    root.inode = 0;
-    std::strcpy(root.item_name, ".");
+    DirectoryItem dot{};
+    dot.inode = 0;
+    std::strcpy(dot.item_name, ".");
+
+    DirectoryItem dotdot{};
+    dotdot.inode = 0;  // root's parent is itself
+    std::strcpy(dotdot.item_name, "..");
+
     file.seekp(sb.data_start_address);
-    file.write(reinterpret_cast<char*>(&root), sizeof(DirectoryItem));
+    file.write(reinterpret_cast<char*>(&dot), sizeof(DirectoryItem));
+    file.write(reinterpret_cast<char*>(&dotdot), sizeof(DirectoryItem));
     file.close();
 
     // --- STEP 7: Expand file to full size ---

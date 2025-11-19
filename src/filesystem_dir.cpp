@@ -176,14 +176,13 @@ void FileSystem::ls(const std::string& name) {
 
     for (int i = 0; i < entries; ++i) {
         file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
-        if (item.inode != 0) {
-            Inode entry = readInode(item.inode);
-            if (entry.is_directory)
-                std::cout << "DIR: ";
-            else
-                std::cout << "FILE: ";
-            std::cout << item.item_name << "\n";
-        }
+        // Show all entries, including "." and ".."
+        Inode entry = readInode(item.inode);
+        if (entry.is_directory)
+            std::cout << "DIR: ";
+        else
+            std::cout << "FILE: ";
+        std::cout << item.item_name << "\n";
     }
 
     file.close();
