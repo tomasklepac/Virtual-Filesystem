@@ -50,10 +50,10 @@ bool FileSystem::format(int sizeMB) {
     sb.cluster_count = sb.disk_size / sb.cluster_size;
 
     // Layout offsets
-    sb.bitmapi_start_adress = sizeof(Superblock);
-    sb.bitmap_start_adress = sb.bitmapi_start_adress + INODE_BITMAP_SIZE;
-    sb.inode_start_adress = sb.bitmap_start_adress + DATA_BITMAP_SIZE;
-    sb.data_start_adress = sb.inode_start_adress + INODE_TABLE_SIZE;
+    sb.bitmapi_start_address = sizeof(Superblock);
+    sb.bitmap_start_address = sb.bitmapi_start_address + INODE_BITMAP_SIZE;
+    sb.inode_start_address = sb.bitmap_start_address + DATA_BITMAP_SIZE;
+    sb.data_start_address = sb.inode_start_address + INODE_TABLE_SIZE;
 
     // --- STEP 3: Write superblock ---
     file.write(reinterpret_cast<char*>(&sb), sizeof(Superblock));
@@ -84,7 +84,7 @@ bool FileSystem::format(int sizeMB) {
     DirectoryItem root{};
     root.inode = 0;
     std::strcpy(root.item_name, ".");
-    file.seekp(sb.data_start_adress);
+    file.seekp(sb.data_start_address);
     file.write(reinterpret_cast<char*>(&root), sizeof(DirectoryItem));
     file.close();
 
@@ -134,7 +134,7 @@ Inode FileSystem::readInode(int inodeId) {
         return inode;
     }
 
-    long long offset = static_cast<long long>(sb.inode_start_adress)
+    long long offset = static_cast<long long>(sb.inode_start_address)
         + static_cast<long long>(inodeId) * sizeof(Inode);
     file.seekg(offset);
     file.read(reinterpret_cast<char*>(&inode), sizeof(Inode));
@@ -155,7 +155,7 @@ void FileSystem::writeInode(int inodeId, const Inode& inode) {
         return;
     }
 
-    long long offset = static_cast<long long>(sb.inode_start_adress)
+    long long offset = static_cast<long long>(sb.inode_start_address)
         + static_cast<long long>(inodeId) * sizeof(Inode);
     file.seekp(offset);
     file.write(reinterpret_cast<const char*>(&inode), sizeof(Inode));
@@ -177,13 +177,13 @@ int FileSystem::allocateFreeInode() {
     }
 
     std::vector<char> bitmap(INODE_BITMAP_SIZE);
-    file.seekg(sb.bitmapi_start_adress);
+    file.seekg(sb.bitmapi_start_address);
     file.read(bitmap.data(), INODE_BITMAP_SIZE);
 
     for (int i = 0; i < INODE_BITMAP_SIZE; ++i) {
         if (bitmap[i] == 0) {
             bitmap[i] = 1;
-            file.seekp(sb.bitmapi_start_adress);
+            file.seekp(sb.bitmapi_start_address);
             file.write(bitmap.data(), INODE_BITMAP_SIZE);
             file.close();
             return i;
@@ -210,13 +210,13 @@ int FileSystem::allocateFreeDataBlock() {
     }
 
     std::vector<char> bitmap(DATA_BITMAP_SIZE);
-    file.seekg(sb.bitmap_start_adress);
+    file.seekg(sb.bitmap_start_address);
     file.read(bitmap.data(), DATA_BITMAP_SIZE);
 
     for (int i = 0; i < DATA_BITMAP_SIZE; ++i) {
         if (bitmap[i] == 0) {
             bitmap[i] = 1;
-            file.seekp(sb.bitmap_start_adress);
+            file.seekp(sb.bitmap_start_address);
             file.write(bitmap.data(), DATA_BITMAP_SIZE);
             file.close();
             return i;
@@ -236,7 +236,7 @@ int FileSystem::allocateFreeDataBlock() {
 // --------------------------------------------------
 long long FileSystem::dataBlockOffset(int blockId) {
     Superblock sb = readSuperblock();
-    return static_cast<long long>(sb.data_start_adress)
+    return static_cast<long long>(sb.data_start_address)
         + static_cast<long long>(blockId) * sb.cluster_size;
 }
 
@@ -294,9 +294,9 @@ void FileSystem::statfs() {
     // --- Read bitmaps ---
     std::vector<char> inodeBitmap(INODE_BITMAP_SIZE);
     std::vector<char> dataBitmap(DATA_BITMAP_SIZE);
-    file.seekg(sb.bitmapi_start_adress);
+    file.seekg(sb.bitmapi_start_address);
     file.read(inodeBitmap.data(), INODE_BITMAP_SIZE);
-    file.seekg(sb.bitmap_start_adress);
+    file.seekg(sb.bitmap_start_address);
     file.read(dataBitmap.data(), DATA_BITMAP_SIZE);
 
     // --- Count used and free bits ---
@@ -309,7 +309,7 @@ void FileSystem::statfs() {
 
     // --- Count directories ---
     int directoryCount = 0;
-    file.seekg(sb.inode_start_adress);
+    file.seekg(sb.inode_start_address);
     const int inodeCount = INODE_TABLE_SIZE / sizeof(Inode);
     for (int i = 0; i < inodeCount; ++i) {
         Inode inode{};
@@ -346,7 +346,7 @@ void FileSystem::load(const std::string& hostFilePath) {
 
     std::string line;
     while (std::getline(script, line)) {
-        // pøeskoè prázdné øádky nebo komentáøe (#)
+        // Skip empty lines or comments (#)
         if (line.empty() || line[0] == '#')
             continue;
 
@@ -354,7 +354,7 @@ void FileSystem::load(const std::string& hostFilePath) {
         std::string cmd, arg1, arg2, arg3;
         iss >> cmd >> arg1 >> arg2 >> arg3;
 
-        // --- základní parser pøíkazù ---
+        // --- Basic command parser ---
         if (cmd == "format") { int n = std::stoi(arg1); format(n); }
         else if (cmd == "mkdir") mkdir(arg1);
         else if (cmd == "rmdir") rmdir(arg1);

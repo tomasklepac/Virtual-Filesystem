@@ -126,17 +126,17 @@ void FileSystem::ls(const std::string& name) {
 
     // --- STEP 1: Resolve target directory ---
     if (!name.empty()) {
-        Inode root = readInode(0);
+        Inode current = readInode(currentDirInode_);
         std::ifstream file(filename_, std::ios::binary);
         if (!file.is_open()) {
             std::cerr << "PATH NOT FOUND\n";
             return;
         }
 
-        file.seekg(dataBlockOffset(root.direct1));
+        file.seekg(dataBlockOffset(current.direct1));
 
         DirectoryItem item{};
-        int entries = root.file_size / sizeof(DirectoryItem);
+        int entries = current.file_size / sizeof(DirectoryItem);
         bool found = false;
 
         for (int i = 0; i < entries; ++i) {
@@ -158,7 +158,7 @@ void FileSystem::ls(const std::string& name) {
     // --- STEP 2: Load inode and verify directory ---
     Inode dirInode = readInode(targetInodeId);
     if (!dirInode.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "PATH NOT FOUND\n";
         return;
     }
 
@@ -178,10 +178,11 @@ void FileSystem::ls(const std::string& name) {
         file.read(reinterpret_cast<char*>(&item), sizeof(DirectoryItem));
         if (item.inode != 0) {
             Inode entry = readInode(item.inode);
-            std::cout << item.item_name;
             if (entry.is_directory)
-                std::cout << "/";
-            std::cout << "\n";
+                std::cout << "DIR: ";
+            else
+                std::cout << "FILE: ";
+            std::cout << item.item_name << "\n";
         }
     }
 
@@ -242,7 +243,7 @@ void FileSystem::cd(const std::string& name) {
         if (std::string(item.item_name) == name) {
             Inode target = readInode(item.inode);
             if (!target.is_directory) {
-                std::cerr << "IS DIRECTORY\n";
+                std::cerr << "PATH NOT FOUND\n";
                 file.close();
                 return;
             }
@@ -425,7 +426,7 @@ void FileSystem::rmdir(const std::string& name) {
     // --- STEP 4: Verify target is a directory ---
     Inode target = readInode(targetInodeId);
     if (!target.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         file.close();
         return;
     }
@@ -441,18 +442,18 @@ void FileSystem::rmdir(const std::string& name) {
     Superblock sb = readSuperblock();
 
     std::vector<char> inodeBitmap(INODE_BITMAP_SIZE);
-    file.seekg(sb.bitmapi_start_adress);
+    file.seekg(sb.bitmapi_start_address);
     file.read(inodeBitmap.data(), INODE_BITMAP_SIZE);
     inodeBitmap[targetInodeId] = 0;
-    file.seekp(sb.bitmapi_start_adress);
+    file.seekp(sb.bitmapi_start_address);
     file.write(inodeBitmap.data(), INODE_BITMAP_SIZE);
 
     std::vector<char> dataBitmap(DATA_BITMAP_SIZE);
-    file.seekg(sb.bitmap_start_adress);
+    file.seekg(sb.bitmap_start_address);
     file.read(dataBitmap.data(), DATA_BITMAP_SIZE);
     if (target.direct1 > 0 && target.direct1 < DATA_BITMAP_SIZE) {
         dataBitmap[target.direct1] = 0;
-        file.seekp(sb.bitmap_start_adress);
+        file.seekp(sb.bitmap_start_address);
         file.write(dataBitmap.data(), DATA_BITMAP_SIZE);
     }
 

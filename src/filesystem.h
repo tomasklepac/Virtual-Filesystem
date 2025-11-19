@@ -22,9 +22,6 @@ public:
     // Formats a new virtual filesystem (creates all metadata structures)
     bool format(int sizeMB);
 
-    // Prints detailed superblock information
-    void printSuperblock();
-
     // ------------------------------------------
     // Directory operations
     // ------------------------------------------

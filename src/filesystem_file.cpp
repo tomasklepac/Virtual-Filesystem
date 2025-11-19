@@ -209,7 +209,7 @@ void FileSystem::write(const std::string& name, const std::string& content) {
     // --- STEP 3: Load inode and prepare block ---
     Inode target = readInode(fileInodeId);
     if (target.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         return;
     }
 
@@ -294,7 +294,7 @@ void FileSystem::rm(const std::string& name) {
     // --- STEP 3: Load target inode ---
     Inode target = readInode(targetInodeId);
     if (target.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         file.close();
         return;
     }
@@ -302,22 +302,22 @@ void FileSystem::rm(const std::string& name) {
     // --- STEP 4: Free data block and inode ---
     Superblock sb = readSuperblock();
     std::vector<char> dataBitmap(DATA_BITMAP_SIZE);
-    file.seekg(sb.bitmap_start_adress);
+    file.seekg(sb.bitmap_start_address);
     file.read(dataBitmap.data(), DATA_BITMAP_SIZE);
 
     if (target.direct1 > 0 && target.direct1 < DATA_BITMAP_SIZE) {
         dataBitmap[target.direct1] = 0;
-        file.seekp(sb.bitmap_start_adress);
+        file.seekp(sb.bitmap_start_address);
         file.write(dataBitmap.data(), DATA_BITMAP_SIZE);
     }
 
     std::vector<char> inodeBitmap(INODE_BITMAP_SIZE);
-    file.seekg(sb.bitmapi_start_adress);
+    file.seekg(sb.bitmapi_start_address);
     file.read(inodeBitmap.data(), INODE_BITMAP_SIZE);
 
     if (targetInodeId < INODE_BITMAP_SIZE) {
         inodeBitmap[targetInodeId] = 0;
-        file.seekp(sb.bitmapi_start_adress);
+        file.seekp(sb.bitmapi_start_address);
         file.write(inodeBitmap.data(), INODE_BITMAP_SIZE);
     }
 
@@ -392,27 +392,47 @@ void FileSystem::info(const std::string& name) {
     Inode target = readInode(targetInodeId);
 
     // --- STEP 4: Print info ---
-    std::string type = target.is_directory ? "DIR" : "FILE";
-
-    std::cout << "[" << type << "] " << name
-        << " - size: " << target.file_size << " B"
-        << " - inode: " << target.id
-        << " - direct blocks: ";
+    std::cout << name
+        << " - " << target.file_size << " B"
+        << " - i-uzel " << target.id
+        << " - ";
 
     int directBlocks[5] = { target.direct1, target.direct2, target.direct3,
                             target.direct4, target.direct5 };
 
-    bool first = true;
+    bool hasBlocks = false;
     for (int b : directBlocks) {
         if (b > 0) {
-            if (!first) std::cout << ", ";
-            std::cout << b;
-            first = false;
+            hasBlocks = true;
+            break;
         }
     }
 
-    if (first)
-        std::cout << "(none)";
+    if (hasBlocks) {
+        std::cout << "přímé odkazy ";
+        bool first = true;
+        for (int b : directBlocks) {
+            if (b > 0) {
+                if (!first) std::cout << ", ";
+                std::cout << b;
+                first = false;
+            }
+        }
+    }
+
+    if (target.indirect1 > 0 || target.indirect2 > 0) {
+        if (hasBlocks) std::cout << " - ";
+        std::cout << "nepřímé odkazy ";
+        bool first = true;
+        if (target.indirect1 > 0) {
+            std::cout << target.indirect1;
+            first = false;
+        }
+        if (target.indirect2 > 0) {
+            if (!first) std::cout << ", ";
+            std::cout << target.indirect2;
+        }
+    }
 
     std::cout << "\n";
 }
@@ -467,7 +487,7 @@ void FileSystem::cp(const std::string& source, const std::string& destination) {
 
     Inode src = readInode(srcInodeId);
     if (src.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         return;
     }
 
@@ -889,7 +909,7 @@ void FileSystem::outcp(const std::string& sourceVfsPath, const std::string& dest
 
     Inode srcFile = readInode(fileInodeId);
     if (srcFile.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         vfs.close();
         return;
     }
@@ -975,7 +995,7 @@ void FileSystem::xcp(const std::string& s1, const std::string& s2, const std::st
 
     Inode f1 = readInode(inode1);
     if (f1.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         vfs.close();
         return;
     }
@@ -1001,7 +1021,7 @@ void FileSystem::xcp(const std::string& s1, const std::string& s2, const std::st
 
     Inode f2 = readInode(inode2);
     if (f2.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         vfs.close();
         return;
     }
@@ -1126,7 +1146,7 @@ void FileSystem::add(const std::string& s1, const std::string& s2) {
 
     Inode f1 = readInode(inode1);
     if (f1.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         vfs.close();
         return;
     }
@@ -1152,7 +1172,7 @@ void FileSystem::add(const std::string& s1, const std::string& s2) {
 
     Inode f2 = readInode(inode2);
     if (f2.is_directory) {
-        std::cerr << "IS DIRECTORY\n";
+        std::cerr << "FILE NOT FOUND\n";
         vfs.close();
         return;
     }

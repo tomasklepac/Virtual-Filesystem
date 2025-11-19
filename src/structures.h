@@ -20,10 +20,10 @@ struct Superblock {
     int32_t disk_size;               // Total size of the virtual disk (bytes)
     int32_t cluster_size;            // Size of one cluster (bytes)
     int32_t cluster_count;           // Total number of clusters
-    int32_t bitmapi_start_adress;   // Byte offset to the inode bitmap
-    int32_t bitmap_start_adress;    // Byte offset to the data bitmap
-    int32_t inode_start_adress;     // Byte offset to the inode table
-    int32_t data_start_adress;      // Byte offset to the data area
+    int32_t bitmapi_start_address;   // Byte offset to the inode bitmap
+    int32_t bitmap_start_address;    // Byte offset to the data bitmap
+    int32_t inode_start_address;     // Byte offset to the inode table
+    int32_t data_start_address;      // Byte offset to the data area
 };
 
 // ---------------- Inode ----------------

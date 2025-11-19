@@ -27,8 +27,13 @@ std::string getCurrentPath(FileSystem& fs) {
     return path;
 }
 
-int main() {
-    FileSystem fs("myfs.dat");
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << (argc > 0 ? argv[0] : "filesystem") << " <filesystem_file>\n";
+        return 1;
+    }
+
+    FileSystem fs(argv[1]);
     std::string input;
 
     std::cout << "===== Virtual Filesystem Shell =====\n";
