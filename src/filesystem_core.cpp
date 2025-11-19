@@ -351,14 +351,32 @@ void FileSystem::statfs() {
 // located on the host filesystem.
 // -------------------------------------------------
 void FileSystem::load(const std::string& hostFilePath) {
-    std::ifstream script(hostFilePath);
+    std::ifstream script(hostFilePath, std::ios::binary);
     if (!script.is_open()) {
         std::cerr << "FILE NOT FOUND\n";
         return;
     }
 
+    // Read entire file and remove UTF-8 BOM if present
+    std::vector<char> fileContent((std::istreambuf_iterator<char>(script)),
+                                   std::istreambuf_iterator<char>());
+    script.close();
+
+    // Remove UTF-8 BOM (0xEF 0xBB 0xBF)
+    size_t startPos = 0;
+    if (fileContent.size() >= 3 &&
+        (unsigned char)fileContent[0] == 0xEF &&
+        (unsigned char)fileContent[1] == 0xBB &&
+        (unsigned char)fileContent[2] == 0xBF) {
+        startPos = 3;
+    }
+
+    // Process lines
+    std::string content(fileContent.begin() + startPos, fileContent.end());
+    std::istringstream scriptStream(content);
+
     std::string line;
-    while (std::getline(script, line)) {
+    while (std::getline(scriptStream, line)) {
         // Skip empty lines or comments (#)
         if (line.empty() || line[0] == '#')
             continue;
