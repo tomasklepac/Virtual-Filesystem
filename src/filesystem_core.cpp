@@ -113,12 +113,13 @@ bool FileSystem::format(int sizeMB) {
 // readSuperblock
 // -------------------------------------------------
 // Loads and returns the current superblock from disk.
+// Returns empty superblock if file doesn't exist (will be created by format).
 // --------------------------------------------------
 Superblock FileSystem::readSuperblock() {
     std::ifstream file(filename_, std::ios::binary);
     Superblock sb{};
     if (!file.is_open()) {
-        std::cerr << "[core] Error: cannot open filesystem file.\n";
+        // File doesn't exist yet - will be created by format() command
         return sb;
     }
     file.read(reinterpret_cast<char*>(&sb), sizeof(Superblock));
@@ -134,6 +135,12 @@ Superblock FileSystem::readSuperblock() {
 Inode FileSystem::readInode(int inodeId) {
     Superblock sb = readSuperblock();
     Inode inode{};
+    
+    // If superblock is empty, file hasn't been formatted yet
+    if (sb.disk_size == 0) {
+        return inode;
+    }
+    
     std::ifstream file(filename_, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "[core] Error: cannot open filesystem file (readInode).\n";
