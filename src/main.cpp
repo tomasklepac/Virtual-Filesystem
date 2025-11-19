@@ -34,12 +34,25 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Construct path to bin directory
-    std::string binPath = "bin";
-    if (!std::filesystem::exists(binPath)) {
-        binPath = ".";
+    // Find bin directory by going up from executable location
+    std::string filename;
+    std::string arg = std::string(argv[1]);
+    
+    // Try to find bin/ directory by checking parent directories
+    std::string currentPath = ".";
+    for (int i = 0; i < 5; i++) {  // Go up max 5 levels
+        std::string binPath = currentPath + "/bin/" + arg;
+        if (std::filesystem::exists(currentPath + "/bin")) {
+            filename = binPath;
+            break;
+        }
+        currentPath = currentPath + "/..";
     }
-    std::string filename = binPath + "/" + std::string(argv[1]);
+    
+    // If not found, try current directory
+    if (filename.empty() || !std::filesystem::exists(filename)) {
+        filename = arg;
+    }
 
     FileSystem fs(filename);
     std::string input;
