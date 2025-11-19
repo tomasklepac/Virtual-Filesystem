@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <fstream>
 #include <iostream>
 #include "structures.h"
@@ -61,9 +62,9 @@ private:
     // Filesystem constants
     // ------------------------------------------
     static constexpr int CLUSTER_SIZE = 1024;                   // 1 KB per data block
-    static constexpr int INODE_BITMAP_SIZE = 128;               // 128 B => 128 inodes max
-    static constexpr int DATA_BITMAP_SIZE = 128;                // 128 B => 128 data blocks max
-    static constexpr int INODE_TABLE_SIZE = 4096;               // 4 KB reserved for inode table
+    static constexpr int INODE_BITMAP_SIZE = 2048;              // 2048 B => 16384 inodes (16 MB inode table)
+    static constexpr int DATA_BITMAP_SIZE = 16384;              // 16384 B => 131072 data blocks (~128 MB)
+    static constexpr int INODE_TABLE_SIZE = 65536;              // 64 KB reserved for inode table
     static constexpr long long BYTES_PER_MB = 1024LL * 1024LL;  // Bytes in one MB
     static constexpr int MAX_NAME_LENGTH = 11;                  // 11 chars (8+3 format)
 
@@ -85,6 +86,7 @@ private:
     // ------------------------------------------
     int allocateFreeInode();                                  // Find and reserve free inode
     int allocateFreeDataBlock();                              // Find and reserve free data block
+    std::vector<int> allocateFreeDataBlocks(int count);       // Allocate multiple free data blocks
     long long dataBlockOffset(int blockId);                   // Get byte offset of a data block
     bool directoryContains(int dirInodeId, const std::string& name); // Check if dir contains item
 

@@ -249,6 +249,60 @@ int FileSystem::allocateFreeDataBlock() {
     return -1;
 }
 
+// Allocate multiple data blocks at once to reduce file I/O overhead
+std::vector<int> FileSystem::allocateFreeDataBlocks(int count) {
+    std::vector<int> allocated;
+    std::cerr << "[BATCH] Allocating " << count << " blocks\n";
+    std::cerr.flush();
+    
+    Superblock sb = readSuperblock();
+    std::fstream file(filename_, std::ios::in | std::ios::out | std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "[alloc-batch] Error: cannot open filesystem file.\n";
+        return allocated;
+    }
+
+    std::vector<char> bitmap(DATA_BITMAP_SIZE);
+    file.seekg(sb.bitmap_start_address);
+    file.read(bitmap.data(), DATA_BITMAP_SIZE);
+    
+    std::cerr << "[BATCH] Bitmap read, searching for " << count << " free blocks\n";
+    std::cerr.flush();
+
+    // Search for free bits and allocate them
+    int allocatedCount = 0;
+    for (int byteIdx = 0; byteIdx < DATA_BITMAP_SIZE && allocatedCount < count; ++byteIdx) {
+        for (int bitIdx = 0; bitIdx < 8 && allocatedCount < count; ++bitIdx) {
+            if ((bitmap[byteIdx] & (1 << bitIdx)) == 0) {
+                // Found free bit
+                bitmap[byteIdx] |= (1 << bitIdx);
+                allocated.push_back(byteIdx * 8 + bitIdx);
+                allocatedCount++;
+            }
+        }
+    }
+
+    std::cerr << "[BATCH] Found " << allocatedCount << " blocks, writing bitmap\n";
+    std::cerr.flush();
+    
+    // Write bitmap back only once
+    if (allocatedCount > 0) {
+        file.seekp(sb.bitmap_start_address);
+        file.write(bitmap.data(), DATA_BITMAP_SIZE);
+    }
+
+    file.close();
+    
+    std::cerr << "[BATCH] Done allocating\n";
+    std::cerr.flush();
+
+    if (allocatedCount < count) {
+        std::cerr << "NO SPACE\n";
+    }
+
+    return allocated;
+}
+
 // -------------------------------------------------
 // dataBlockOffset
 // -------------------------------------------------

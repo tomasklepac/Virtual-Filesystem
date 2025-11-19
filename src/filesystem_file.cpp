@@ -981,26 +981,33 @@ void FileSystem::incp(const std::string& sourceHostPath, const std::string& dest
     int contentSize = static_cast<int>(content.size());
     int blocksNeeded = (contentSize + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     
-    // Allocate and write direct blocks first
+    // Batch allocate all needed blocks upfront (including indirect block pointers)
+    int extraBlocksForIndirection = 0;
+    if (blocksNeeded > 5) {
+        int indirectBlocksNeeded = blocksNeeded - 5;
+        if (indirectBlocksNeeded > 0) extraBlocksForIndirection++;  // indirect1
+        if (indirectBlocksNeeded > 256) extraBlocksForIndirection++; // indirect2
+    }
+    
+    std::vector<int> allBlocks = allocateFreeDataBlocks(blocksNeeded + extraBlocksForIndirection);
+    if (allBlocks.size() != blocksNeeded + extraBlocksForIndirection) {
+        std::cerr << "NO SPACE\n";
+        return;
+    }
+    
     std::vector<int> directBlocks(5, 0);
     std::vector<int> indirectBlocks;
     int indirect1 = 0, indirect2 = 0;
+    int blockIndex = 0;
     
     std::fstream vfs(filename_, std::ios::in | std::ios::out | std::ios::binary);
     int written = 0;
     
-    // Write to direct blocks
-    for (int i = 0; i < std::min(5, blocksNeeded); ++i) {
-        int blockId = allocateFreeDataBlock();
-        if (blockId == -1) {
-            vfs.close();
-            std::cerr << "NO SPACE\n";
-            return;
-        }
-        directBlocks[i] = blockId;
-        
+    // Assign first 5 blocks as direct blocks
+    for (int i = 0; i < std::min(5, (int)allBlocks.size()); ++i) {
+        directBlocks[i] = allBlocks[blockIndex++];
         int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
-        vfs.seekp(dataBlockOffset(blockId));
+        vfs.seekp(dataBlockOffset(directBlocks[i]));
         vfs.write(content.data() + written, toWrite);
         written += toWrite;
     }
@@ -1009,70 +1016,62 @@ void FileSystem::incp(const std::string& sourceHostPath, const std::string& dest
     if (blocksNeeded > 5) {
         int indirectBlocksNeeded = blocksNeeded - 5;
         
-        // Allocate indirect1
-        indirect1 = allocateFreeDataBlock();
-        if (indirect1 == -1) {
-            vfs.close();
-            std::cerr << "NO SPACE\n";
-            return;
+        // Use pre-allocated indirect1 block
+        indirect1 = allBlocks[blockIndex++];
+        
+        // Collect indirect1 blocks
+        std::vector<int> indirect1Blocks;
+        int blocksForIndirect1 = std::min(256, indirectBlocksNeeded);
+        for (int i = 0; i < blocksForIndirect1; ++i) {
+            indirect1Blocks.push_back(allBlocks[blockIndex++]);
+            indirectBlocks.push_back(allBlocks[blockIndex - 1]);
         }
         
-        // Write pointers and data for indirect1
+        // Write pointers for indirect1
         vfs.seekp(dataBlockOffset(indirect1));
-        int ptrCount = 0;
-        for (int i = 0; i < std::min(256, indirectBlocksNeeded); ++i) {
-            int blockId = allocateFreeDataBlock();
-            if (blockId == -1) {
-                vfs.close();
-                std::cerr << "NO SPACE\n";
-                return;
-            }
-            
-            int32_t ptr = blockId;
+        for (int i = 0; i < indirect1Blocks.size(); ++i) {
+            int32_t ptr = indirect1Blocks[i];
             vfs.write(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
-            indirectBlocks.push_back(blockId);
-            
-            // Write data to this block
+        }
+        
+        // Write data for indirect1 blocks
+        for (int i = 0; i < indirect1Blocks.size(); ++i) {
             int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
-            vfs.seekp(dataBlockOffset(blockId));
+            vfs.seekp(dataBlockOffset(indirect1Blocks[i]));
             vfs.write(content.data() + written, toWrite);
             written += toWrite;
-            
-            // Seek back to indirect1 for next pointer
-            vfs.seekp(dataBlockOffset(indirect1) + (i + 1) * sizeof(int32_t));
-            ptrCount++;
         }
         
         // Handle indirect2 if needed
         if (indirectBlocksNeeded > 256) {
-            indirect2 = allocateFreeDataBlock();
-            if (indirect2 == -1) {
-                vfs.close();
-                std::cerr << "NO SPACE\n";
-                return;
+            // Use pre-allocated indirect2 block
+            indirect2 = allBlocks[blockIndex++];
+            
+            // Collect indirect2 blocks
+            std::vector<int> indirect2Blocks;
+            int blocksForIndirect2 = indirectBlocksNeeded - 256;
+            
+            for (int i = 0; i < blocksForIndirect2; ++i) {
+                if (blockIndex >= allBlocks.size()) {
+                    break;
+                }
+                indirect2Blocks.push_back(allBlocks[blockIndex++]);
+                indirectBlocks.push_back(allBlocks[blockIndex - 1]);
             }
             
+            // Write pointers for indirect2
             vfs.seekp(dataBlockOffset(indirect2));
-            for (int i = 0; i < indirectBlocksNeeded - 256; ++i) {
-                int blockId = allocateFreeDataBlock();
-                if (blockId == -1) {
-                    vfs.close();
-                    std::cerr << "NO SPACE\n";
-                    return;
-                }
-                
-                int32_t ptr = blockId;
+            for (int i = 0; i < indirect2Blocks.size(); ++i) {
+                int32_t ptr = indirect2Blocks[i];
                 vfs.write(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
-                indirectBlocks.push_back(blockId);
-                
-                // Write data to this block
+            }
+            
+            // Write data for indirect2 blocks
+            for (int i = 0; i < indirect2Blocks.size(); ++i) {
                 int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
-                vfs.seekp(dataBlockOffset(blockId));
+                vfs.seekp(dataBlockOffset(indirect2Blocks[i]));
                 vfs.write(content.data() + written, toWrite);
                 written += toWrite;
-                
-                // Seek back to indirect2 for next pointer
-                vfs.seekp(dataBlockOffset(indirect2) + (i + 1) * sizeof(int32_t));
             }
         }
     }
