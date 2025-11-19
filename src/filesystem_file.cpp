@@ -394,7 +394,7 @@ void FileSystem::info(const std::string& name) {
     // --- STEP 4: Print info ---
     std::cout << name
         << " - " << target.file_size << " B"
-        << " - i-uzel " << target.id
+        << " - inode " << target.id
         << " - ";
 
     int directBlocks[5] = { target.direct1, target.direct2, target.direct3,
@@ -409,7 +409,7 @@ void FileSystem::info(const std::string& name) {
     }
 
     if (hasBlocks) {
-        std::cout << "přímé odkazy ";
+        std::cout << "direct_blocks ";
         bool first = true;
         for (int b : directBlocks) {
             if (b > 0) {
@@ -422,7 +422,7 @@ void FileSystem::info(const std::string& name) {
 
     if (target.indirect1 > 0 || target.indirect2 > 0) {
         if (hasBlocks) std::cout << " - ";
-        std::cout << "nepřímé odkazy ";
+        std::cout << "indirect_blocks ";
         bool first = true;
         if (target.indirect1 > 0) {
             std::cout << target.indirect1;
@@ -716,6 +716,17 @@ void FileSystem::incp(const std::string& sourceHostPath, const std::string& dest
     std::vector<char> content((std::istreambuf_iterator<char>(input)),
         std::istreambuf_iterator<char>());
     input.close();
+
+    // Debug: Check for BOM
+    if (content.size() >= 3) {
+        unsigned char b0 = (unsigned char)content[0];
+        unsigned char b1 = (unsigned char)content[1];
+        unsigned char b2 = (unsigned char)content[2];
+        if (b0 == 0xEF && b1 == 0xBB && b2 == 0xBF) {
+            // Remove UTF-8 BOM
+            content.erase(content.begin(), content.begin() + 3);
+        }
+    }
 
     // --- STEP 2: Parse destination path ---
     size_t slashPos = destVfsPath.find('/');
