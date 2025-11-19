@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    FileSystem fs(argv[1]);
+    FileSystem fs("bin/" + std::string(argv[1]));
     std::string input;
 
     std::cout << "===== Virtual Filesystem Shell =====\n";
