@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 // =============================================
 // main.cpp
@@ -33,7 +34,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    FileSystem fs("bin/" + std::string(argv[1]));
+    // Construct path to bin directory
+    std::string binPath = "bin";
+    if (!std::filesystem::exists(binPath)) {
+        binPath = ".";
+    }
+    std::string filename = binPath + "/" + std::string(argv[1]);
+
+    FileSystem fs(filename);
     std::string input;
 
     std::cout << "===== Virtual Filesystem Shell =====\n";
