@@ -717,7 +717,7 @@ void FileSystem::incp(const std::string& sourceHostPath, const std::string& dest
         std::istreambuf_iterator<char>());
     input.close();
 
-    // Debug: Check for BOM
+    // Check for BOM
     if (content.size() >= 3) {
         unsigned char b0 = (unsigned char)content[0];
         unsigned char b1 = (unsigned char)content[1];
