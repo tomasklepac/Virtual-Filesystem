@@ -681,12 +681,64 @@ void FileSystem::cp(const std::string& source, const std::string& destination) {
     // --- STEP 3: Read content from source ---
     std::string content;
     if (src.file_size > 0 && src.direct1 > 0) {
-        std::ifstream fs(filename_, std::ios::binary);
-        fs.seekg(dataBlockOffset(src.direct1));
+        // Build list of blocks to read (same as cat)
+        std::vector<int> blockList;
+        
+        // Add direct blocks
+        if (src.direct1 > 0) blockList.push_back(src.direct1);
+        if (src.direct2 > 0) blockList.push_back(src.direct2);
+        if (src.direct3 > 0) blockList.push_back(src.direct3);
+        if (src.direct4 > 0) blockList.push_back(src.direct4);
+        if (src.direct5 > 0) blockList.push_back(src.direct5);
+        
+        // Add indirect1 blocks
+        if (src.indirect1 > 0) {
+            std::ifstream fsind(filename_, std::ios::binary);
+            fsind.seekg(dataBlockOffset(src.indirect1));
+            for (int i = 0; i < 256; ++i) {
+                int32_t ptr = 0;
+                fsind.read(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
+                if (ptr > 0) {
+                    blockList.push_back(ptr);
+                } else {
+                    break;
+                }
+            }
+            fsind.close();
+        }
+        
+        // Add indirect2 blocks
+        if (src.indirect2 > 0) {
+            std::ifstream fsind(filename_, std::ios::binary);
+            fsind.seekg(dataBlockOffset(src.indirect2));
+            for (int i = 0; i < 256; ++i) {
+                int32_t ptr = 0;
+                fsind.read(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
+                if (ptr > 0) {
+                    blockList.push_back(ptr);
+                } else {
+                    break;
+                }
+            }
+            fsind.close();
+        }
+        
+        // Read content from all blocks
         std::vector<char> buffer(src.file_size + 1, 0);
-        fs.read(buffer.data(), src.file_size);
-        fs.close();
-        content = std::string(buffer.data(), src.file_size);
+        std::ifstream fs(filename_, std::ios::binary);
+        if (fs.is_open()) {
+            int totalRead = 0;
+            for (int blockId : blockList) {
+                if (totalRead >= src.file_size) break;
+                
+                int toRead = std::min(CLUSTER_SIZE, src.file_size - totalRead);
+                fs.seekg(dataBlockOffset(blockId));
+                fs.read(buffer.data() + totalRead, toRead);
+                totalRead += toRead;
+            }
+            fs.close();
+            content = std::string(buffer.data(), src.file_size);
+        }
     }
 
     // --- STEP 4: Check if destination exists ---
@@ -709,17 +761,115 @@ void FileSystem::cp(const std::string& source, const std::string& destination) {
     newFile.file_size = static_cast<int>(content.size());
 
     if (!content.empty()) {
-        int newBlock = allocateFreeDataBlock();
-        if (newBlock == -1) {
+        int contentSize = content.size();
+        int blocksNeeded = (contentSize + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+        int extraBlocksForIndirection = 0;
+        
+        // Calculate extra blocks needed for indirection
+        if (blocksNeeded > 5) {
+            if (blocksNeeded <= 261) {  // 5 + 256
+                extraBlocksForIndirection = 1;  // indirect1 block
+            } else {
+                extraBlocksForIndirection = 2;  // indirect1 + indirect2 blocks
+            }
+        }
+        
+        std::vector<int> allBlocks = allocateFreeDataBlocks(blocksNeeded + extraBlocksForIndirection);
+        if (allBlocks.size() != blocksNeeded + extraBlocksForIndirection) {
             std::cerr << "NO SPACE\n";
             return;
         }
-        newFile.direct1 = newBlock;
-
-        std::fstream fs(filename_, std::ios::in | std::ios::out | std::ios::binary);
-        fs.seekp(dataBlockOffset(newBlock));
-        fs.write(content.c_str(), content.size());
-        fs.close();
+        
+        std::vector<int> directBlocks(5, 0);
+        std::vector<int> indirectBlocks;
+        int indirect1 = 0, indirect2 = 0;
+        int blockIndex = 0;
+        
+        std::fstream vfs(filename_, std::ios::in | std::ios::out | std::ios::binary);
+        int written = 0;
+        
+        // Assign first 5 blocks as direct blocks
+        for (int i = 0; i < std::min(5, (int)allBlocks.size()); ++i) {
+            directBlocks[i] = allBlocks[blockIndex++];
+            int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
+            vfs.seekp(dataBlockOffset(directBlocks[i]));
+            vfs.write(content.data() + written, toWrite);
+            written += toWrite;
+        }
+        
+        // Handle indirect blocks if needed
+        if (blocksNeeded > 5) {
+            int indirectBlocksNeeded = blocksNeeded - 5;
+            
+            // Use pre-allocated indirect1 block
+            indirect1 = allBlocks[blockIndex++];
+            
+            // Collect indirect1 blocks
+            std::vector<int> indirect1Blocks;
+            int blocksForIndirect1 = std::min(256, indirectBlocksNeeded);
+            for (int i = 0; i < blocksForIndirect1; ++i) {
+                indirect1Blocks.push_back(allBlocks[blockIndex++]);
+                indirectBlocks.push_back(allBlocks[blockIndex - 1]);
+            }
+            
+            // Write pointers for indirect1
+            vfs.seekp(dataBlockOffset(indirect1));
+            for (int i = 0; i < indirect1Blocks.size(); ++i) {
+                int32_t ptr = indirect1Blocks[i];
+                vfs.write(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
+            }
+            
+            // Write data for indirect1 blocks
+            for (int i = 0; i < indirect1Blocks.size(); ++i) {
+                int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
+                vfs.seekp(dataBlockOffset(indirect1Blocks[i]));
+                vfs.write(content.data() + written, toWrite);
+                written += toWrite;
+            }
+            
+            // Handle indirect2 if needed
+            if (indirectBlocksNeeded > 256) {
+                // Use pre-allocated indirect2 block
+                indirect2 = allBlocks[blockIndex++];
+                
+                // Collect indirect2 blocks
+                std::vector<int> indirect2Blocks;
+                int blocksForIndirect2 = indirectBlocksNeeded - 256;
+                
+                for (int i = 0; i < blocksForIndirect2; ++i) {
+                    if (blockIndex >= allBlocks.size()) {
+                        break;
+                    }
+                    indirect2Blocks.push_back(allBlocks[blockIndex++]);
+                    indirectBlocks.push_back(allBlocks[blockIndex - 1]);
+                }
+                
+                // Write pointers for indirect2
+                vfs.seekp(dataBlockOffset(indirect2));
+                for (int i = 0; i < indirect2Blocks.size(); ++i) {
+                    int32_t ptr = indirect2Blocks[i];
+                    vfs.write(reinterpret_cast<char*>(&ptr), sizeof(int32_t));
+                }
+                
+                // Write data for indirect2 blocks
+                for (int i = 0; i < indirect2Blocks.size(); ++i) {
+                    int toWrite = std::min(CLUSTER_SIZE, contentSize - written);
+                    vfs.seekp(dataBlockOffset(indirect2Blocks[i]));
+                    vfs.write(content.data() + written, toWrite);
+                    written += toWrite;
+                }
+            }
+        }
+        vfs.close();
+        
+        // Set block references in inode
+        newFile.direct1 = directBlocks[0];
+        newFile.direct2 = directBlocks[1];
+        newFile.direct3 = directBlocks[2];
+        newFile.direct4 = directBlocks[3];
+        newFile.direct5 = directBlocks[4];
+        newFile.indirect1 = indirect1;
+        newFile.indirect2 = indirect2;
     }
 
     writeInode(newInodeId, newFile);
